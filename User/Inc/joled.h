@@ -18,7 +18,12 @@
 #define __JOLED_H__
 
 #include <stdint.h>
+
+/*选择是否使用DMA版OLED*/
+/*使用DMA版OLED需注意I2C中断回调函数的使用！*/
 #include "oled.h"
+
+//#include "oled_DMA.h"
 
 #ifdef __cplusplus
 extern "C" {
