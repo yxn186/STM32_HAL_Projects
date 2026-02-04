@@ -27,6 +27,9 @@
 /* USER CODE BEGIN Includes */
 #include <stdint.h>
 #include "joled.h"
+#include "Encoder.h"
+#include "No_Blocking_Key.h"
+#include "servo.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -58,7 +61,13 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if(htim == &htim4)
+  {
+    Key_Tick();
+  }
+}
 /* USER CODE END 0 */
 
 /**
@@ -97,13 +106,46 @@ int main(void)
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
   JOLED_Init();
+  Encoder_Init(&htim1);
+  Servo_Init(&htim2,TIM_CHANNEL_1);
+  Servo_Init(&htim2,TIM_CHANNEL_2);
+
+  HAL_TIM_Base_Start_IT(&htim4);
   
+  int16_t Angle= 0;
+  Key_State state;
+  int8_t temp = 1;
+  int16_t Duty;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    Angle =  Encoder_Get_Angle(&htim1);
+    JOLED_ShowSignedNum(1, 1, Angle, 3);
+    JOLED_ShowNum(2, 1, __HAL_TIM_GET_COUNTER(&htim1), 6);
+    state = Key_Get_Event(1);
+
+    if(state != KEY_FREE)
+    {
+      temp = -temp;
+    }
+
+    JOLED_ShowSignedNum(3,1,temp,1);
+    
+    if(temp == 1)
+    {
+      Duty = Servo_Set_Angle(&htim2, TIM_CHANNEL_1, -Angle);
+    }
+    else if (temp == -1)
+    {
+      Duty = Servo_Set_Angle(&htim2, TIM_CHANNEL_2, -Angle);
+    }
+    
+    JOLED_ShowNum(4, 1, Duty, 6);
+    
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
