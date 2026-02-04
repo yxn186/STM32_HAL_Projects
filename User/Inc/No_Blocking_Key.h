@@ -1,15 +1,15 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    key.h
+  * @file    No_Blocking_Key.h
   * @brief   This file contains all the function prototypes for
-  *          the key.c file
+  *          the No_Blocking_Key.c file
   ******************************************************************************
   */
 /* USER CODE END Header */
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __KEY_H__
-#define __KEY_H__
+#ifndef __NO_BLOCKING_KEY_H__
+#define __NO_BLOCKING_KEY_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -92,4 +92,4 @@ void Key_Tick(void);
 }
 #endif
 
-#endif /* __KEY_H__ */
+#endif /* __NO_BLOCKING_KEY_H__ */
