@@ -20,12 +20,14 @@
 #include "main.h"
 #include "dma.h"
 #include "i2c.h"
+#include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdint.h>
 #include "joled.h"
+#include "Serial.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,7 +59,8 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+/* payload 接收缓冲：建议比 SERIAL_PKT_MAX_LEN 大一点点 */
+static uint8_t rx_payload[256 + 1];   // +1 用来补 '\0'（当字符串用时）
 /* USER CODE END 0 */
 
 /**
@@ -91,18 +94,44 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_I2C1_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   JOLED_Init();
-  
+  Serial_Init();
+
+  Serial_Printf("[BOOT] Serial DMA ring OK\r\n");
+  uint32_t last_tick = HAL_GetTick();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    Serial_Printf("hello PC!\r\n");
+    if(HAL_GetTick() - last_tick >= 100)
+    {
+      last_tick = HAL_GetTick();
+      JOLED_ShowNum(1, 1, 1, 1);
+    }
+    
+    /*非阻塞收包：有完整包就取出来，没有就立刻返回 0 */
+    uint16_t len = Serial_TryGetPacket(rx_payload, 256);
+
+    if(len > 0)
+    {
+      /* 如果你把 payload 当“字符串”处理：自己补 '\0' */
+      if(len > 256) 
+      {
+        len = 256;
+      }
+
+      rx_payload[len] = '\0';
+
+      /*收到就回显（回显内容的格式你自己定） */
+      Serial_Printf("[RX payload len=%u] %s\r\n", len, rx_payload);
+    }
     /* USER CODE END WHILE */
-    
-    
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
