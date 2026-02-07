@@ -17,7 +17,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-
+#include "stm32f1xx_hal_tim.h"
 /*YOUR CODE*/
 
 /**

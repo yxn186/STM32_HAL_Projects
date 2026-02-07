@@ -9,10 +9,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "Encoder.h"
 #include "stm32f1xx_hal_tim.h"
-#include "tim.h"
 #include <stdint.h>
-
-
 
 /**
  * @brief 初始化旋转编码器
