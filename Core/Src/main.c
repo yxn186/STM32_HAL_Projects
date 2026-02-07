@@ -18,9 +18,11 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "Serial.h"
 #include "dma.h"
 #include "i2c.h"
 #include "tim.h"
+#include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -30,6 +32,7 @@
 #include "Encoder.h"
 #include "No_Blocking_Key.h"
 #include "servo.h"
+#include "Serial.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -101,50 +104,103 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_I2C1_Init();
-  MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM4_Init();
+  MX_USART1_UART_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
   JOLED_Init();
-  Encoder_Init(&htim1);
+  Serial_Init();
+  Serial_Printf("串口上电!\r\n");
+  Encoder_Init(&htim3);
   Servo_Init(&htim2,TIM_CHANNEL_1);
   Servo_Init(&htim2,TIM_CHANNEL_2);
 
   HAL_TIM_Base_Start_IT(&htim4);
   
   int16_t Angle= 0;
+  int16_t Serial_Angle;
   Key_State state;
-  int8_t temp = 1;
   int16_t Duty;
+  uint16_t Serial_len;
+  uint8_t Serial_RxData[256+1];
 
+  typedef enum
+  {
+    k_state_e_1 = 0,
+    k_state_e_2,
+    k_state_s_1,
+    k_state_s_2,
+    k_state_max
+  } Servo_key_state;
+
+ Servo_key_state s_k_s = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    Angle =  Encoder_Get_Angle(&htim1);
+    Angle =  Encoder_Get_Angle(&htim3);
     JOLED_ShowSignedNum(1, 1, Angle, 3);
-    JOLED_ShowNum(2, 1, __HAL_TIM_GET_COUNTER(&htim1), 6);
+    
     state = Key_Get_Event(1);
 
     if(state != KEY_FREE)
     {
-      temp = -temp;
+      s_k_s = (s_k_s + 1) % k_state_max;
     }
 
-    JOLED_ShowSignedNum(3,1,temp,1);
-    
-    if(temp == 1)
+    Serial_len = Serial_TryGetPacket(Serial_RxData, 256);
+
+    if(Serial_len > 0)
+    {
+      if(Serial_len > 256)
+      {
+        Serial_len = 256;
+      }
+      Serial_Angle = 0;
+      Serial_RxData[Serial_len] = '\0';
+
+      for(uint8_t i = 0;i < Serial_len;i++)
+      {
+        if(Serial_RxData[0] == '-' && i == 0)
+        {
+          continue;
+        }
+        Serial_Angle = Serial_Angle*10 + Serial_RxData[i] - '0';//带进位
+      }
+      
+      if(Serial_RxData[0] == '-')
+      {
+        Serial_Angle = -Serial_Angle;
+      }
+
+      Serial_Printf("串口收到数据！解析为 %d 度\r\n",Serial_Angle);
+    }
+
+    if(s_k_s == k_state_e_1)
     {
       Duty = Servo_Set_Angle(&htim2, TIM_CHANNEL_1, -Angle);
     }
-    else if (temp == -1)
+    else if (s_k_s == k_state_e_2)
     {
       Duty = Servo_Set_Angle(&htim2, TIM_CHANNEL_2, -Angle);
     }
-    
+    else if (s_k_s == k_state_s_1)
+    {
+      Duty = Servo_Set_Angle(&htim2, TIM_CHANNEL_1, -Serial_Angle);
+    }
+    else if (s_k_s == k_state_s_2)
+    {
+       Duty = Servo_Set_Angle(&htim2, TIM_CHANNEL_2, -Serial_Angle);
+    }    
+      
+    JOLED_ShowNum(2, 1, Serial_len, 6);
+    JOLED_ShowSignedNum(1, 1, Angle, 3);
+    JOLED_ShowSignedNum(1, 5, Serial_Angle, 3);
     JOLED_ShowNum(4, 1, Duty, 6);
+    JOLED_ShowSignedNum(3,1,s_k_s,1); 
     
     /* USER CODE END WHILE */
 
