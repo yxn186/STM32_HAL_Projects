@@ -9,7 +9,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "servo.h"
 #include "stm32f1xx_hal_tim.h"
-#include "tim.h"
 #include <stdint.h>
 
 /**

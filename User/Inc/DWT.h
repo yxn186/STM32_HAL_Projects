@@ -1,15 +1,15 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    Encoder.h
+  * @file    DWT.h
   * @brief   This file contains all the function prototypes for
-  *          the Encoder.c file
+  *          the DWT.c file
   ******************************************************************************
   */
 /* USER CODE END Header */
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __ENCODER_H__
-#define __ENCODER_H__
+#ifndef __DWT_H__
+#define __DWT_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,27 +17,39 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stm32f1xx_hal_tim.h"
+#include <stdint.h>
+
 /*YOUR CODE*/
-/**
- * @brief 初始化旋转编码器
- * 
- * @param Encoder_TIM 填写旋转编码器对应的htimx
- */
-void Encoder_Init(TIM_HandleTypeDef *Encoder_TIM);
 
 /**
- * @brief 获取旋转编码器角度
+ * @brief 初始化DWT
  * 
- * @param Encoder_TIM 填写旋转编码器对应的htimx
- * @return int16_t 返回有符号的角度（-359~+359）
  */
-int16_t Encoder_Get_Angle(TIM_HandleTypeDef *Encoder_TIM);
+void DWT_Init(void);
 
+/**
+ * @brief 取得当前CYCCNT
+ * 
+ * @return uint32_t 
+ */
+uint32_t DWT_GetCYCCNT(void);
 
+/**
+ * @brief 取得当前微妙
+ * 
+ * @return uint64_t 
+ */
+uint64_t DWT_GetUs(void);
+
+/**
+ * @brief 取得当前毫秒
+ * 
+ * @return uint64_t 
+ */
+uint64_t DWT_GetMs(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __ENCODER_H__ */
+#endif /* __DWT_H__ */
