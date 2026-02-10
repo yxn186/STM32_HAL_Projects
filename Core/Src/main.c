@@ -119,7 +119,8 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim4);
   
   int16_t Angle= 0;
-  int16_t Serial_Angle;
+  int16_t Serial_Angle = 0;
+  int16_t Ozone_Angle = 0;
   Key_State state;
   int16_t Duty;
   uint16_t Serial_len;
@@ -131,6 +132,7 @@ int main(void)
     k_state_e_2,
     k_state_s_1,
     k_state_s_2,
+    k_state_o,
     k_state_max
   } Servo_key_state;
 
@@ -194,11 +196,15 @@ int main(void)
     else if (s_k_s == k_state_s_2)
     {
        Duty = Servo_Set_Angle(&htim2, TIM_CHANNEL_2, -Serial_Angle);
-    }    
+    }
+    else if(s_k_s == k_state_o)
+    {
+      Duty = Servo_Set_Angle(&htim2, TIM_CHANNEL_2, Ozone_Angle);
+    }
       
     JOLED_ShowNum(2, 1, Serial_len, 6);
     JOLED_ShowSignedNum(1, 1, Angle, 3);
-    JOLED_ShowSignedNum(1, 5, Serial_Angle, 3);
+    JOLED_ShowSignedNum(1, 6, Serial_Angle, 3);
     JOLED_ShowNum(4, 1, Duty, 6);
     JOLED_ShowSignedNum(3,1,s_k_s,1); 
     
