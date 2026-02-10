@@ -41,6 +41,16 @@ message("Build type: " ${CMAKE_BUILD_TYPE})
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
 
+# ---------------------------------------------------------------------------
+# Keep only main.cpp: ignore CubeMX-referenced main.c (may not exist)
+# MUST be placed before add_subdirectory(cmake/stm32cubemx)
+set(MX_MAIN_C ${CMAKE_SOURCE_DIR}/Core/Src/main.c)
+set_source_files_properties(${MX_MAIN_C} PROPERTIES
+    GENERATED TRUE
+    HEADER_FILE_ONLY TRUE
+)
+# ---------------------------------------------------------------------------
+
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
@@ -54,7 +64,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user sources here
+    ${CMAKE_SOURCE_DIR}/Core/Src/main.cpp
 )
 
 # Add include paths

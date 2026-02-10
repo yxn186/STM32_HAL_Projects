@@ -100,6 +100,109 @@ Learning the STM32HAL
 
 
 
+## C++配置
+
+使用CubeMX+Vscode开发支持C++的
+
+参考https://blog.csdn.net/qq_38961840/article/details/142530594
+
+大概就是使用cubemx的User Actions功能
+
+因为比如main.c
+
+改成cpp之后 再用cubemx生成代码 cubemx只生成.c
+
+所以原理就是 在生成代码之前 把cpp改成c文件 然后生成代码 然后再生成cpp 这样就不会出问题了
+
+AI增强过的代码 使用.bat文件 放入目录中
+
+```bat
+@echo off
+echo =============^> GeneratorBefore.bat run ^<=============
+
+set "main_c_file=%~dp0Core\Src\main.c"
+set "main_cpp_file=%~dp0Core\Src\main.cpp"
+
+echo main_c_file  = "%main_c_file%"
+echo main_cpp_file= "%main_cpp_file%"
+
+if exist "%main_cpp_file%" (
+    REM If a stale main.c exists, remove it to avoid rename failure
+    if exist "%main_c_file%" (
+        echo Found existing main.c, deleting it...
+        del /f /q "%main_c_file%"
+        if errorlevel 1 (
+            echo [ERR] Failed to delete main.c
+            exit /b 11
+        )
+        echo Deleted main.c OK
+    )
+
+    echo Found main.cpp
+    ren "%main_cpp_file%" main.c
+    if errorlevel 1 (
+        echo [ERR] Rename failed: main.cpp to main.c
+        exit /b 12
+    )
+    echo Rename OK: main.cpp to main.c
+) else (
+    echo [ERR] main.cpp not found
+    exit /b 10
+)
+
+echo =============^> GeneratorBefore.bat stop ^<=============
+
+```
+
+
+
+```c
+@echo off
+echo ============= GeneratorAfter.bat run =============
+
+set "main_c_file=%~dp0Core\Src\main.c"
+set "main_cpp_file=%~dp0Core\Src\main.cpp"
+
+if exist "%main_c_file%" (
+    if exist "%main_cpp_file%" (
+        echo [ERR] main.cpp already exists, abort.
+        exit /b 20
+    )
+    ren "%main_c_file%" main.cpp
+    if errorlevel 1 (
+        echo [ERR] Rename failed.
+        exit /b 21
+    )
+    echo OK renamed main.c to main.cpp
+) else (
+    echo [ERR] main.c not found
+    exit /b 30
+)
+
+echo ============= GeneratorAfter.bat stop =============
+
+```
+
+
+
+同时也要修改顶层的CMakeLists
+
+因为这个目录下的cmakelists有个
+
+```cmake
+# STM32CubeMX generated application sources
+set(MX_Application_Src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/main.c
+```
+
+cubemx生成时 永远都是main.c 需改成cpp才能成功编译 但是每次改很麻烦 使用上面的after好像也不能改
+
+所以就在顶层cmakelists里忽略一下这个这样的操作
+
+**cmakelists代码一同放在下面**
+
+
+
 ## 文件层级逻辑（知道即可）
 
 Core下的Inc和Src存放由CubeMX自动生成的.h .c
@@ -129,6 +232,10 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 
+# >>> C++ settings (ADD)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# <<<
 
 # Define the build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -142,14 +249,27 @@ set(CMAKE_PROJECT_NAME Project)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
 # Core project settings
-project(${CMAKE_PROJECT_NAME})
+# >>> REPLACE: enable CXX here
+project(${CMAKE_PROJECT_NAME} LANGUAGES C CXX ASM)
+# <<<
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
-# Enable CMake support for ASM and C languages
-enable_language(C ASM)
+# >>> DELETE: no longer needed because LANGUAGES already includes them
+# enable_language(C ASM)
+# <<<
 
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
+
+# ---------------------------------------------------------------------------
+# Keep only main.cpp: ignore CubeMX-referenced main.c (may not exist)
+# MUST be placed before add_subdirectory(cmake/stm32cubemx)
+set(MX_MAIN_C ${CMAKE_SOURCE_DIR}/Core/Src/main.c)
+set_source_files_properties(${MX_MAIN_C} PROPERTIES
+    GENERATED TRUE
+    HEADER_FILE_ONLY TRUE
+)
+# ---------------------------------------------------------------------------
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
@@ -164,7 +284,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user sources here
+    ${CMAKE_SOURCE_DIR}/Core/Src/main.cpp
 )
 
 # Add include paths
@@ -176,7 +296,6 @@ target_include_directories(stm32cubemx INTERFACE
     ${CMAKE_SOURCE_DIR}/User/Inc
 )
 
-
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
@@ -184,6 +303,7 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Remove wrong libob.a library dependency when using cpp files
 list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
+list(REMOVE_ITEM CMAKE_CXX_IMPLICIT_LINK_LIBRARIES ob)
 
 # Add linked libraries
 target_link_libraries(${CMAKE_PROJECT_NAME}
@@ -193,6 +313,9 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     # Add user defined libraries
 )
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfloat-abi=soft")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -u _printf_float")
+
 ```
 
 
@@ -200,26 +323,23 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 这是User下的
 
 ```cmake
+cmake_minimum_required(VERSION 3.22)
+
 add_library(user STATIC)
 
-# 自动收集 User/Src 下所有 .c（新增文件后更容易自动感知）
 file(GLOB_RECURSE USER_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_LIST_DIR}/Src/*.c
+    ${CMAKE_CURRENT_LIST_DIR}/Src/*.cpp
 )
 
-target_sources(user PRIVATE
-    ${USER_SOURCES}
-)
+target_sources(user PRIVATE ${USER_SOURCES})
 
-# 让别的 target include "oled.h" 这种时能找到 User/Inc
 target_include_directories(user PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/Inc
 )
 
-# 让 user 也能用 HAL / Core 的头文件和编译宏（比如 STM32F103xB）
-target_link_libraries(user PUBLIC
-    stm32cubemx
-)
+# 让 user 也能用到 HAL/CMSIS 的 include/宏（可按你需求）
+target_link_libraries(user PUBLIC stm32cubemx)
 
 ```
 
