@@ -21,6 +21,8 @@
 #include "can.h"
 #include "dma.h"
 #include "i2c.h"
+#include "stm32f1xx_hal_tim.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -28,6 +30,7 @@
 /* USER CODE BEGIN Includes */
 #include <stdint.h>
 #include "joled.h"
+#include "DJI_Motor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -59,6 +62,18 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+DJI_Motor_Data_t DJI_Motors_Data[8];
+float Angle;
+float Speed;
+int16_t Out = 1000;
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if(htim == &htim1)
+  {
+    DJI_Motor_Control_Single(&hcan, DJI_Motor_3508, 1, Out);
+  }
+}
 
 /* USER CODE END 0 */
 
@@ -95,16 +110,21 @@ int main(void)
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   MX_CAN_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
   JOLED_Init();
-  
+  HAL_TIM_Base_Start_IT(&htim1);
+  DJI_Motor_Init(&hcan,DJI_Motors_Data);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    
+    Speed = DJI_Motor_Get_AngleSpeed(1);
+    Angle = DJI_Motor_Get_Angle(1);
+    JOLED_ShowNum(1, 1, Angle, 10);
+    JOLED_ShowNum(2, 1, Speed, 10);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
