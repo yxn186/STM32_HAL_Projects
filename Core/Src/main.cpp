@@ -31,6 +31,8 @@
 #include <stdint.h>
 #include "joled.h"
 #include "DJI_Motor.h"
+#include "PID.h"
+#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -63,15 +65,29 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 DJI_Motor_Data_t DJI_Motors_Data[8];
-float Angle;
-float Speed;
 int16_t Out = 1000;
+PID_Cfg_t DJI_Motor_PID_Cfg_Data = {0};
+PID_Status_t DJI_Motor_PID_States = {0};
+uint64_t PID_Time_ms;
+
+float a,b,w;
+
+void PID_Target_Init(void)
+{
+	a = 1.045;
+	b = 2.090 - a;
+	w = 1.884;
+	PID_Time_ms = 0;
+}
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   if(htim == &htim1)
   {
-    DJI_Motor_Control_Single(&hcan, DJI_Motor_3508, 1, Out);
+    DJI_Motor_PID_Cfg_Data.Target = (a*sinf(w*PID_Time_ms/1000.0)+b)*19.0;	
+    PID_Control_Single(&DJI_Motor_PID_Cfg_Data,&DJI_Motor_PID_States);
+    DJI_Motor_Control_Single(&hcan, DJI_Motor_3508, 1, DJI_Motor_PID_States.Out);
+    PID_Time_ms ++;
   }
 }
 
@@ -115,16 +131,18 @@ int main(void)
   JOLED_Init();
   HAL_TIM_Base_Start_IT(&htim1);
   DJI_Motor_Init(&hcan,DJI_Motors_Data);
+  PID_Target_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    Speed = DJI_Motor_Get_AngleSpeed(1);
-    Angle = DJI_Motor_Get_Angle(1);
-    JOLED_ShowNum(1, 1, Angle, 10);
-    JOLED_ShowNum(2, 1, Speed, 10);
+    DJI_Motor_PID_States.Current_speed = DJI_Motor_Get_AngleSpeed(1);
+    DJI_Motor_PID_States.Current_Angle = DJI_Motor_Get_Angle(1);
+    JOLED_ShowNum(1, 1, DJI_Motor_PID_States.Current_speed, 10);
+    JOLED_ShowNum(2, 1,  DJI_Motor_PID_States.Current_Angle, 10);
+    JOLED_ShowNum(3, 1, PID_Time_ms, 5);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

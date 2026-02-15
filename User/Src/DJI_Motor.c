@@ -2,7 +2,7 @@
 /**
   ******************************************************************************
   * @file    DJI_Motor.c
-  * @brief   大疆系电机库（目前只支持单种电机多个使用）
+  * @brief   大疆系电机库（目前只支持单种电机多个使用）（3508 6020）
   ******************************************************************************
   */
 /* USER CODE END Header */
@@ -15,7 +15,24 @@
  * @brief 基准ID 用3508选0x201 用6020选0x205
  * 
  */
-#define Motor_ID_Start 0x201   
+#define Motor_ID_Start 0x201
+
+/**
+ * @brief 6020和3508电机输出限幅宏定义
+ * 
+ */
+#define DJI_Motor_6020_Out_Max  25000
+#define DJI_Motor_6020_Out_Min  -25000
+#define DJI_Motor_3508_Out_Max  16384
+#define DJI_Motor_3508_Out_Min  -16384
+
+/**
+ * @brief 发送数据数组（static）
+ * 
+ */
+static uint8_t TxData_200[8] = {0};
+static uint8_t TxData_1FF[8] = {0};
+static uint8_t TxData_2FF[8] = {0};
 
 static DJI_Motor_Data_t *DJI_Motors_Data_Temp = NULL;
 
@@ -92,7 +109,8 @@ void DJI_Motor_Init(CAN_HandleTypeDef *hcan,DJI_Motor_Data_t DJI_Motors_Data[8])
  */
 void DJI_Motor_Control_Single(CAN_HandleTypeDef *hcan,DJI_Motor_Type_Typedef DJI_Motor_Type,uint16_t DJI_Motor_ID,int16_t Out)
 {
-    static uint8_t TxData8[8] = {0};
+    uint8_t *TxData = NULL;
+
     uint16_t TxID = 0;
 
     //1 判断电机型号 赋值发送ID和限幅Out
@@ -101,20 +119,22 @@ void DJI_Motor_Control_Single(CAN_HandleTypeDef *hcan,DJI_Motor_Type_Typedef DJI
         if(DJI_Motor_ID > 0 && DJI_Motor_ID <= 4)
         {
             TxID = 0x1FF;
+            TxData = TxData_1FF;
         }
         else if(DJI_Motor_ID > 4 && DJI_Motor_ID <= 7)
         {
             TxID = 0x2FF;
+            TxData = TxData_2FF;
             DJI_Motor_ID = DJI_Motor_ID - 4;
         }
 
-        if(Out >= 25000)
+        if(Out >= DJI_Motor_6020_Out_Max)
         {
-            Out = 25000;
+            Out = DJI_Motor_6020_Out_Max;
         }
-        else if (Out <= -25000)
+        else if (Out <= DJI_Motor_6020_Out_Min)
         {
-            Out = -25000;
+            Out = DJI_Motor_6020_Out_Min;
         }
     }
     else if(DJI_Motor_Type == DJI_Motor_3508)
@@ -122,55 +142,108 @@ void DJI_Motor_Control_Single(CAN_HandleTypeDef *hcan,DJI_Motor_Type_Typedef DJI
         if(DJI_Motor_ID > 0 && DJI_Motor_ID <= 4)
         {
             TxID = 0x200;
+            TxData = TxData_200;
         }
         else if(DJI_Motor_ID > 4 && DJI_Motor_ID <= 8)
         {
             TxID = 0x1FF;
+            TxData = TxData_1FF;
             DJI_Motor_ID = DJI_Motor_ID - 4;
         }
 
-        if(Out >= 16384)
+        if(Out >= DJI_Motor_3508_Out_Max)
         {
-            Out = 16384;
+            Out = DJI_Motor_3508_Out_Max;
         }
-        else if (Out <= -16384)
+        else if (Out <= DJI_Motor_3508_Out_Min)
         {
-            Out = -16384;
+            Out = DJI_Motor_3508_Out_Min;
         }
     }
 
-    if (TxID == 0)//防炸
+    if(TxID == 0)//防炸
     {
         return;
     }
 
     //2 数据处理 
     uint8_t DJI_Motor_ID_Temp = (uint8_t)(DJI_Motor_ID - 1);
-    TxData8[2*DJI_Motor_ID_Temp]   = (uint8_t)((uint16_t)Out >> 8);
-    TxData8[2*DJI_Motor_ID_Temp+1] = (uint8_t)((uint16_t)Out);
+    TxData[2*DJI_Motor_ID_Temp]   = (uint8_t)((uint16_t)Out >> 8);
+    TxData[2*DJI_Motor_ID_Temp+1] = (uint8_t)((uint16_t)Out);
 
-    // if(DJI_Motor_ID == 1)
-    // {
-    //     TxData8[0] = Out >> 8;
-    //     TxData8[1] = Out;
-    // }
-    // else if(DJI_Motor_ID == 2)
-    // {
-    //     TxData8[2] = Out >> 8;
-    //     TxData8[3] = Out;
-    // }
-    // else if(DJI_Motor_ID == 3)
-    // {
-    //     TxData8[4] = Out >> 8;
-    //     TxData8[5] = Out;
-    // }
-    // else if(DJI_Motor_ID == 4)
-    // {
-    //     TxData8[6] = Out >> 8;
-    //     TxData8[7] = Out;
-    // }
+    CAN_Send_Data(hcan,TxID,TxData,8);
+}
 
-    CAN_Send_Data(hcan,TxID,TxData8,8);
+/**
+ * @brief 大疆双电机控制函数（针对6020电机）
+ * 
+ * @param hcan hcanx
+ * @param DJI_Motor_Type 电机型号 DJI_Motor_6020
+ * @param DJI_Motor_ID1 电机CAN-ID  6020：1~7
+ * @param Out1 输出值1 6020电压控制：-25000~0~25000
+ * @param DJI_Motor_ID2 电机CAN-ID  6020：1~7
+ * @param Out2 输出值2 6020电压控制：-25000~0~25000
+ */
+void DJI_Motor_Control_Double(CAN_HandleTypeDef *hcan,DJI_Motor_Type_Typedef DJI_Motor_Type,uint8_t DJI_Motor_ID1,int16_t Out1,uint8_t DJI_Motor_ID2,int16_t Out2)
+{
+    uint8_t *TxData = NULL;
+
+    uint16_t TxID = 0;
+
+    if(Out1 >= DJI_Motor_6020_Out_Max)
+    {
+         Out1 = DJI_Motor_6020_Out_Max;
+    }
+    else if (Out1 <= DJI_Motor_6020_Out_Min)
+    {
+        Out1 = DJI_Motor_6020_Out_Min;
+    }
+
+    if(Out2 >= DJI_Motor_6020_Out_Max)
+    {
+         Out2 = DJI_Motor_6020_Out_Max;
+    }
+    else if (Out2 <= DJI_Motor_6020_Out_Min)
+    {
+        Out2 = DJI_Motor_6020_Out_Min;
+    }
+
+    //同一区间ID
+    if(((DJI_Motor_ID1 >= 1 && DJI_Motor_ID1 <= 4) && (DJI_Motor_ID2 >= 1 && DJI_Motor_ID2 <= 4)) || ((DJI_Motor_ID1 >= 5 && DJI_Motor_ID1 <= 7) && (DJI_Motor_ID2 >= 5 && DJI_Motor_ID2 <= 7)))
+    {
+        //同1-4
+        if((DJI_Motor_ID1 >= 1 && DJI_Motor_ID1 <= 4) && (DJI_Motor_ID2 >= 1 && DJI_Motor_ID2 <= 4))
+        {
+            TxID = 0x1FF;
+            TxData = TxData_1FF;
+        }
+        else if((DJI_Motor_ID1 >= 5 && DJI_Motor_ID1 <= 7) && (DJI_Motor_ID2 >= 5 && DJI_Motor_ID2 <= 7))
+        {
+            TxID = 0x2FF;
+            TxData = TxData_2FF;
+            DJI_Motor_ID1 = DJI_Motor_ID1 - 4;
+            DJI_Motor_ID2 = DJI_Motor_ID2 - 4;
+        }
+
+        if(TxID == 0)//防炸
+        {
+            return;
+        }
+        uint8_t DJI_Motor_ID_Temp = (uint8_t)(DJI_Motor_ID1 - 1);
+        TxData[2*DJI_Motor_ID_Temp]   = (uint8_t)((uint16_t)Out1 >> 8);
+        TxData[2*DJI_Motor_ID_Temp+1] = (uint8_t)((uint16_t)Out1);
+
+        DJI_Motor_ID_Temp = (uint8_t)(DJI_Motor_ID2 - 1);
+        TxData[2*DJI_Motor_ID_Temp]   = (uint8_t)((uint16_t)Out2 >> 8);
+        TxData[2*DJI_Motor_ID_Temp+1] = (uint8_t)((uint16_t)Out2);
+
+        CAN_Send_Data(hcan,TxID,TxData,8);
+    }
+    else//不同区间ID 分开发送
+    {
+        DJI_Motor_Control_Single(hcan,DJI_Motor_Type,DJI_Motor_ID1,Out1);
+        DJI_Motor_Control_Single(hcan,DJI_Motor_Type,DJI_Motor_ID2,Out2);
+    }
 }
 
 /**
