@@ -8,7 +8,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "DJI_Motor.h"
-#include "MyCAN.h"
+#include "CAN.h"
 #include <stdint.h>
 
 /**

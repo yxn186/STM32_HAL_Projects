@@ -34,10 +34,6 @@ project(${CMAKE_PROJECT_NAME} LANGUAGES C CXX ASM)
 # <<<
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
-# >>> DELETE: no longer needed because LANGUAGES already includes them
-# enable_language(C ASM)
-# <<<
-
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
 
@@ -54,8 +50,43 @@ set_source_files_properties(${MX_MAIN_C} PROPERTIES
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
-# Add user library
-add_subdirectory(User)
+# ---------------------------------------------------------------------------
+# Global include collection to allow: #include "can.h" anywhere
+# It will add every directory that contains headers under bsp/module/application
+# ---------------------------------------------------------------------------
+function(collect_header_dirs out_var base_dir)
+    file(GLOB_RECURSE _hdrs CONFIGURE_DEPENDS
+        ${base_dir}/*.h
+        ${base_dir}/*.hpp
+        ${base_dir}/*.hh
+        ${base_dir}/*.hxx
+    )
+    set(_dirs "")
+    foreach(_h ${_hdrs})
+        get_filename_component(_d "${_h}" DIRECTORY)
+        list(APPEND _dirs "${_d}")
+    endforeach()
+    list(REMOVE_DUPLICATES _dirs)
+    set(${out_var} ${_dirs} PARENT_SCOPE)
+endfunction()
+
+add_library(project_includes INTERFACE)
+
+collect_header_dirs(BSP_HDR_DIRS  "${CMAKE_SOURCE_DIR}/bsp")
+collect_header_dirs(MOD_HDR_DIRS  "${CMAKE_SOURCE_DIR}/module")
+collect_header_dirs(APP_HDR_DIRS  "${CMAKE_SOURCE_DIR}/application")
+
+target_include_directories(project_includes INTERFACE
+    ${BSP_HDR_DIRS}
+    ${MOD_HDR_DIRS}
+    ${APP_HDR_DIRS}
+)
+# ---------------------------------------------------------------------------
+
+# Add layered libraries
+add_subdirectory(bsp)
+add_subdirectory(module)
+add_subdirectory(application)
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -72,10 +103,6 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
 )
 
-target_include_directories(stm32cubemx INTERFACE
-    ${CMAKE_SOURCE_DIR}/User/Inc
-)
-
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
@@ -86,9 +113,16 @@ list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 list(REMOVE_ITEM CMAKE_CXX_IMPLICIT_LINK_LIBRARIES ob)
 
 # Add linked libraries
+# Use --start-group/--end-group to tolerate "anyone calls anyone" among static libs
 target_link_libraries(${CMAKE_PROJECT_NAME}
-    user
+    project_includes
+
+    -Wl,--start-group
+    application
+    module
+    bsp
     stm32cubemx
+    -Wl,--end-group
 
     # Add user defined libraries
 )
