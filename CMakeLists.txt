@@ -52,7 +52,7 @@ add_subdirectory(cmake/stm32cubemx)
 
 # ---------------------------------------------------------------------------
 # Global include collection to allow: #include "can.h" anywhere
-# It will add every directory that contains headers under bsp/modules/application
+# It will add every directory that contains headers under bsp/module/application
 # ---------------------------------------------------------------------------
 function(collect_header_dirs out_var base_dir)
     file(GLOB_RECURSE _hdrs CONFIGURE_DEPENDS
@@ -73,7 +73,7 @@ endfunction()
 add_library(project_includes INTERFACE)
 
 collect_header_dirs(BSP_HDR_DIRS  "${CMAKE_SOURCE_DIR}/bsp")
-collect_header_dirs(MOD_HDR_DIRS  "${CMAKE_SOURCE_DIR}/modules")
+collect_header_dirs(MOD_HDR_DIRS  "${CMAKE_SOURCE_DIR}/module")
 collect_header_dirs(APP_HDR_DIRS  "${CMAKE_SOURCE_DIR}/application")
 
 target_include_directories(project_includes INTERFACE
@@ -119,7 +119,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 
     -Wl,--start-group
     application
-    modules
+    module
     bsp
     stm32cubemx
     -Wl,--end-group
