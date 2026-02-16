@@ -205,17 +205,25 @@ cubemx生成时 永远都是main.c 需改成cpp才能成功编译 但是每次�
 
 ## 文件层级逻辑（知道即可）
 
+### CubeMX 生成代码
+
 Core下的Inc和Src存放由CubeMX自动生成的.h .c
 
 所以记得要打开CubeMX中
 
 Project Manager-Code Generator中的生成.c.h文件选项
 
-然后User下的Inc和Src就存放自己的.h .c
+### bsp、module、application层
 
-为此有两个CMakelists要修改
+```ruby
+bsp/          # 板级支持：引脚/句柄/端口适配（更贴近硬件）
+module/       # 功能模块：驱动/算法/组件（尽量少依赖具体板子）
+application/  # 应用层：业务逻辑/任务/状态机，把 module 拼起来实现功能
+```
 
-这是根目录下的
+**camkelists配置**
+
+根目录下的camkelists
 
 ```cmake
 cmake_minimum_required(VERSION 3.22)
@@ -254,10 +262,6 @@ project(${CMAKE_PROJECT_NAME} LANGUAGES C CXX ASM)
 # <<<
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
-# >>> DELETE: no longer needed because LANGUAGES already includes them
-# enable_language(C ASM)
-# <<<
-
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
 
@@ -274,8 +278,43 @@ set_source_files_properties(${MX_MAIN_C} PROPERTIES
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
-# Add user library
-add_subdirectory(User)
+# ---------------------------------------------------------------------------
+# Global include collection to allow: #include "can.h" anywhere
+# It will add every directory that contains headers under bsp/module/application
+# ---------------------------------------------------------------------------
+function(collect_header_dirs out_var base_dir)
+    file(GLOB_RECURSE _hdrs CONFIGURE_DEPENDS
+        ${base_dir}/*.h
+        ${base_dir}/*.hpp
+        ${base_dir}/*.hh
+        ${base_dir}/*.hxx
+    )
+    set(_dirs "")
+    foreach(_h ${_hdrs})
+        get_filename_component(_d "${_h}" DIRECTORY)
+        list(APPEND _dirs "${_d}")
+    endforeach()
+    list(REMOVE_DUPLICATES _dirs)
+    set(${out_var} ${_dirs} PARENT_SCOPE)
+endfunction()
+
+add_library(project_includes INTERFACE)
+
+collect_header_dirs(BSP_HDR_DIRS  "${CMAKE_SOURCE_DIR}/bsp")
+collect_header_dirs(MOD_HDR_DIRS  "${CMAKE_SOURCE_DIR}/module")
+collect_header_dirs(APP_HDR_DIRS  "${CMAKE_SOURCE_DIR}/application")
+
+target_include_directories(project_includes INTERFACE
+    ${BSP_HDR_DIRS}
+    ${MOD_HDR_DIRS}
+    ${APP_HDR_DIRS}
+)
+# ---------------------------------------------------------------------------
+
+# Add layered libraries
+add_subdirectory(bsp)
+add_subdirectory(module)
+add_subdirectory(application)
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -292,10 +331,6 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
 )
 
-target_include_directories(stm32cubemx INTERFACE
-    ${CMAKE_SOURCE_DIR}/User/Inc
-)
-
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
@@ -306,9 +341,16 @@ list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 list(REMOVE_ITEM CMAKE_CXX_IMPLICIT_LINK_LIBRARIES ob)
 
 # Add linked libraries
+# Use --start-group/--end-group to tolerate "anyone calls anyone" among static libs
 target_link_libraries(${CMAKE_PROJECT_NAME}
-    user
+    project_includes
+
+    -Wl,--start-group
+    application
+    module
+    bsp
     stm32cubemx
+    -Wl,--end-group
 
     # Add user defined libraries
 )
@@ -320,28 +362,92 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -u _printf_float")
 
 
 
-这是User下的
+这是bsp的
 
 ```cmake
 cmake_minimum_required(VERSION 3.22)
 
-add_library(user STATIC)
-
-file(GLOB_RECURSE USER_SOURCES CONFIGURE_DEPENDS
-    ${CMAKE_CURRENT_LIST_DIR}/Src/*.c
-    ${CMAKE_CURRENT_LIST_DIR}/Src/*.cpp
+file(GLOB_RECURSE BSP_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_LIST_DIR}/*.c
+    ${CMAKE_CURRENT_LIST_DIR}/*.cpp
 )
 
-target_sources(user PRIVATE ${USER_SOURCES})
+if(BSP_SOURCES)
+    add_library(bsp STATIC ${BSP_SOURCES})
+else()
+    set(BSP_DUMMY ${CMAKE_CURRENT_BINARY_DIR}/bsp_dummy.c)
+    file(WRITE ${BSP_DUMMY}
+        "/* Auto-generated placeholder (no sources in bsp/ yet) */\n"
+        "void __bsp_dummy(void) {}\n"
+    )
+    add_library(bsp STATIC ${BSP_DUMMY})
+endif()
 
-target_include_directories(user PUBLIC
-    ${CMAKE_CURRENT_LIST_DIR}/Inc
+target_link_libraries(bsp PUBLIC
+    project_includes
+    stm32cubemx
 )
-
-# 让 user 也能用到 HAL/CMSIS 的 include/宏（可按你需求）
-target_link_libraries(user PUBLIC stm32cubemx)
 
 ```
 
 
+
+module
+
+```cmake
+cmake_minimum_required(VERSION 3.22)
+
+file(GLOB_RECURSE MOD_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_LIST_DIR}/*.c
+    ${CMAKE_CURRENT_LIST_DIR}/*.cpp
+)
+
+if(MOD_SOURCES)
+    add_library(module STATIC ${MOD_SOURCES})
+else()
+    set(MOD_DUMMY ${CMAKE_CURRENT_BINARY_DIR}/modules_dummy.c)
+    file(WRITE ${MOD_DUMMY}
+        "/* Auto-generated placeholder (no sources in module/ yet) */\n"
+        "void __modules_dummy(void) {}\n"
+    )
+    add_library(module STATIC ${MOD_DUMMY})
+endif()
+
+target_link_libraries(module PUBLIC
+    project_includes
+    stm32cubemx
+)
+
+```
+
+
+
+application
+
+```cmake
+cmake_minimum_required(VERSION 3.22)
+
+file(GLOB_RECURSE APP_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_LIST_DIR}/*.c
+    ${CMAKE_CURRENT_LIST_DIR}/*.cpp
+)
+
+# 没有源文件也允许生成一个“占位源文件”，避免 add_library 报错
+if(APP_SOURCES)
+    add_library(application STATIC ${APP_SOURCES})
+else()
+    set(APP_DUMMY ${CMAKE_CURRENT_BINARY_DIR}/application_dummy.c)
+    file(WRITE ${APP_DUMMY}
+        "/* Auto-generated placeholder (no sources in application/ yet) */\n"
+        "void __application_dummy(void) {}\n"
+    )
+    add_library(application STATIC ${APP_DUMMY})
+endif()
+
+target_link_libraries(application PUBLIC
+    project_includes
+    stm32cubemx
+)
+
+```
 
