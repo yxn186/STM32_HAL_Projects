@@ -1,13 +1,13 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    MyCAN.c
+  * @file    CAN.c
   * @brief   CAN使用
   ******************************************************************************
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include "MyCAN.h"
+#include "CAN.h"
 #include "stm32f1xx_hal_can.h"
 
 static  CAN_RxCallBack_Function CAN_RxCallBack_FIFO0_Function = 0;

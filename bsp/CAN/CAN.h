@@ -1,7 +1,7 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    MyCAN.h
+  * @file    CAN.h
   * @brief   This file contains all the function prototypes for
   *          the MyCAN.c file
   ******************************************************************************
