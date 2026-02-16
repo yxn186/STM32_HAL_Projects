@@ -22,6 +22,7 @@ extern "C" {
 /*YOUR CODE*/
 
 /* DJI电机ID宏定义 */
+//目前似乎没什么用
 #define ID1_3508 0x201
 #define ID2_3508 0x202
 #define ID3_3508 0x203

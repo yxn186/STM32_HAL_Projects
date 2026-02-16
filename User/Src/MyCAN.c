@@ -9,7 +9,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "MyCAN.h"
 #include "stm32f1xx_hal_can.h"
-#include <stdint.h>
 
 static  CAN_RxCallBack_Function CAN_RxCallBack_FIFO0_Function = 0;
 static  CAN_RxCallBack_Function CAN_RxCallBack_FIFO1_Function = 0;
