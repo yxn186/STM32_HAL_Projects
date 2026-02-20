@@ -114,7 +114,7 @@ void JOLED_ShowChar(uint8_t Line, uint8_t Column, char Char)
   _joled_refresh_if_needed();
 }
 
-void JOLED_ShowString(uint8_t Line, uint8_t Column, char *String)
+void JOLED_ShowString(uint8_t Line, uint8_t Column, const char *String)
 {
   if (!g_joled.inited)
     return;

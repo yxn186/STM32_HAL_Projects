@@ -72,7 +72,7 @@ void JOLED_ShowChar(uint8_t Line, uint8_t Column, char Char);
  * @param  String 以 '\0' 结尾的 C 字符串指针（NULL 会被忽略）
  * @note   字符串过长会在到达第 16 列时停止（不自动换行）
  */
-void JOLED_ShowString(uint8_t Line, uint8_t Column, char *String);
+void JOLED_ShowString(uint8_t Line, uint8_t Column, const char *String);
 
 /**
  * @brief  显示无符号十进制数字（固定长度，前导补 0）
