@@ -7,7 +7,7 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include "CAN.h"
+#include "bsp_can.h"
 #include "stm32f1xx_hal_can.h"
 
 static  CAN_RxCallBack_Function CAN_RxCallBack_FIFO0_Function = 0;
