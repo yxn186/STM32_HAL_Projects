@@ -30,6 +30,7 @@
 #include "joled.h"
 #include "bsp_spi.h"
 #include "W25Q64.h"
+#include "app_W25Q64.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -61,11 +62,7 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint8_t MID;
-uint16_t DID;
 
-uint8_t ArrayWrite[] = {0x01,0x09,0x03,0x04};
-uint8_t ArrayRead[4];
 /* USER CODE END 0 */
 
 /**
@@ -103,37 +100,16 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   JOLED_Init();
-  
+  App_W25Q64_Init();
 
 
-  JOLED_ShowString(1,1,"MID:   DID:");
-	JOLED_ShowString(2,1,"W:");
-	JOLED_ShowString(3,1,"R:");
-
-  W25Q64_ReadID(&hspi1,&MID,&DID);
-	JOLED_ShowHexNum(1,5,MID,2);
-	JOLED_ShowHexNum(1,12,DID,4);
-
-  W25Q64_SectorErase(&hspi1,0x000000);
-	W25Q64_PageProgram(&hspi1,0x000000,ArrayWrite,4);
-	
-	W25Q64_ReadData(&hspi1,0x000000,ArrayRead,4);
-	
-	JOLED_ShowHexNum(2,3,ArrayWrite[0],2);
-	JOLED_ShowHexNum(2,6,ArrayWrite[1],2);
-	JOLED_ShowHexNum(2,9,ArrayWrite[2],2);
-	JOLED_ShowHexNum(2,12,ArrayWrite[3],2);
-	
-	JOLED_ShowHexNum(3,3,ArrayRead[0],2);
-	JOLED_ShowHexNum(3,6,ArrayRead[1],2);
-	JOLED_ShowHexNum(3,9,ArrayRead[2],2);
-	JOLED_ShowHexNum(3,12,ArrayRead[3],2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    App_W25Q64_TaskLoop();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
