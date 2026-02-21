@@ -1,11 +1,29 @@
 cmake_minimum_required(VERSION 3.22)
 
-file(GLOB_RECURSE APP_SOURCES CONFIGURE_DEPENDS
-    ${CMAKE_CURRENT_LIST_DIR}/*.c
-    ${CMAKE_CURRENT_LIST_DIR}/*.cpp
+# ============================================================
+# application layer: MANUAL source list
+# 说明：
+# - 新增/删除 app 层源文件时，需要在下面的 APP_SOURCES 里手动维护
+# ============================================================
+
+set(APP_SOURCES
+    # ---- application 业务代码（手动添加）----
+    #
+    #       ！！！使用方法！！！
+    #
+    #   假设你新建了：application/gimbal/app_gimbal.c
+    #   在文件系统里创建 .c/.cpp（你照常写代码）
+    #   打开 application/CMakeLists.txt
+    #   把文件路径加到 APP_SOURCES：
+    #   ${CMAKE_CURRENT_LIST_DIR}/gimbal/app_gimbal.c
+
+    #${CMAKE_CURRENT_LIST_DIR}/W25Q64/app_W25Q64.c
+
 )
 
-# 没有源文件也允许生成一个“占位源文件”，避免 add_library 报错
+# ============================================================
+# 空源文件保护：避免 add_library(application STATIC) 报错
+# ============================================================
 if(APP_SOURCES)
     add_library(application STATIC ${APP_SOURCES})
 else()
