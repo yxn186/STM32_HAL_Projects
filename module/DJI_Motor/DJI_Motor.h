@@ -18,7 +18,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "CAN.h"
+#include "bsp_can.h"
 /*YOUR CODE*/
 
 /* DJI电机ID宏定义 */
