@@ -20,6 +20,7 @@
 #include "main.h"
 #include "dma.h"
 #include "i2c.h"
+#include "spi.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -28,8 +29,7 @@
 #include <stdint.h>
 #include "joled.h"
 #include "bsp_spi.h"
-#include "W25Q64.h"
-//#include "app_W25Q64.h"
+#include "app_bmi088.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -96,9 +96,10 @@ int main(void)
   MX_DMA_Init();
   MX_I2C1_Init();
   MX_USART1_UART_Init();
+  MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   JOLED_Init();
-  //App_W25Q64_Init();
+  app_bmi088_init();
 
 
   /* USER CODE END 2 */
@@ -107,7 +108,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-   // App_W25Q64_TaskLoop();
+    app_bmi088_loop();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

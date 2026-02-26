@@ -18,7 +18,7 @@ set(APP_SOURCES
     #   ${CMAKE_CURRENT_LIST_DIR}/gimbal/app_gimbal.c
 
     #${CMAKE_CURRENT_LIST_DIR}/W25Q64/app_W25Q64.c
-
+    ${CMAKE_CURRENT_LIST_DIR}/bmi088/app_bmi088.c
 )
 
 # ============================================================

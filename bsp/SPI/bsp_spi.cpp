@@ -92,6 +92,45 @@ uint8_t SPI_Transmit_Data(SPI_HandleTypeDef *hspi, GPIO_TypeDef *GPIOx, uint16_t
 }
 
 /**
+ * @brief 阻塞发送数据
+ *
+ * @param hspi SPI编号
+ * @param GPIOx 片选GPIO引脚编组
+ * @param GPIO_Pin 片选GPIO引脚号
+ * @param Activate_Level 片选有效电平（一般CS低有效就传 GPIO_PIN_RESET）
+ * @param Tx_Buffer 发送缓冲区
+ * @param Tx_Length 发送长度
+ * @param Timeout 超时（ms），比如 10/100，或 HAL_MAX_DELAY
+ * @return uint8_t 执行状态（HAL_OK / HAL_BUSY / HAL_ERROR / HAL_TIMEOUT）
+ */
+uint8_t SPI_Transmit_Data_Blocking(SPI_HandleTypeDef *hspi,GPIO_TypeDef *GPIOx,uint16_t GPIO_Pin,GPIO_PinState Activate_Level,uint8_t *Tx_Buffer,uint16_t Tx_Length,uint32_t Timeout)
+{
+    if (hspi == nullptr) return HAL_ERROR;
+    if (Tx_Buffer == nullptr) return HAL_ERROR;
+    if (Tx_Length == 0) return HAL_ERROR;
+
+    // 如果SPI正在忙（可能DMA还没结束），直接返回忙
+    if (hspi->State != HAL_SPI_STATE_READY) return HAL_BUSY;
+
+    // 片选拉到有效电平
+    if (GPIOx != nullptr)
+    {
+        HAL_GPIO_WritePin(GPIOx, GPIO_Pin, Activate_Level);
+    }
+
+    // 阻塞发送
+    HAL_StatusTypeDef state = HAL_SPI_Transmit(hspi, Tx_Buffer, Tx_Length, Timeout);
+
+    // 片选释放（写回相反电平）
+    if (GPIOx != nullptr)
+    {
+        HAL_GPIO_WritePin(GPIOx, GPIO_Pin,(Activate_Level == GPIO_PIN_SET) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+    }
+
+    return (uint8_t)state;
+}
+
+/**
  * @brief 交互数据帧
  * 
  * @param hspi SPI编号

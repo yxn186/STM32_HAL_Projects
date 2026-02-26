@@ -129,8 +129,7 @@ typedef struct
 
     W25Q64_CurrentOperation current_operation;  //目前状态
 
-    /* 这次操作需要的发送缓冲区 / 接收缓冲区
-       JEDEC ID 固定 4 字节，所以这里直接给 4 字节数组 */
+    /* 这次操作需要的发送缓冲区 / 接收缓冲区 */
     uint8_t Tx_buffer[260];
     uint8_t Rx_buffer[260];
 

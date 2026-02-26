@@ -443,19 +443,9 @@ void W25Q64_ReadData(W25Q64_Handle_t *handle,uint32_t address,uint8_t *data_arra
     SPI_Transmit_Receive_Data(handle->hspi,handle->chip_select_gpiox,handle->chip_select_pin,handle->chip_select_gpio_pinstate,handle->Tx_buffer,handle->Rx_buffer,4,(uint16_t)count);
 }
 
-/**
- * @brief W25Q64TxRx回调函数
- * 
- * @param Tx_Buffer 发送缓冲区
- * @param Rx_Buffer 接收缓冲区
- * @param Tx_Length 发送长度
- * @param Rx_Length 接受长度
- */
+
 void W25Q64_SPI_TxRxCallback(uint8_t *Tx_Buffer,uint8_t *Rx_Buffer,uint16_t Tx_Length,uint16_t Rx_Length)
 {
-    (void)Tx_Buffer;
-    (void)Tx_Length;
-
     if (W25Q64_Handle_Global == NULL) return;
 
 	//reading id入口

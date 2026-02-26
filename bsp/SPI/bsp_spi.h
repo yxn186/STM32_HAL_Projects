@@ -72,6 +72,20 @@ void SPI_Init(SPI_HandleTypeDef *hspi, SPI_Callback Callback_Function);
 uint8_t SPI_Transmit_Data(SPI_HandleTypeDef *hspi, GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin, GPIO_PinState Activate_Level, uint8_t *Tx_Buffer, uint16_t Tx_Length);
 
 /**
+ * @brief 阻塞发送数据
+ *
+ * @param hspi SPI编号
+ * @param GPIOx 片选GPIO引脚编组
+ * @param GPIO_Pin 片选GPIO引脚号
+ * @param Activate_Level 片选有效电平（一般CS低有效就传 GPIO_PIN_RESET）
+ * @param Tx_Buffer 发送缓冲区
+ * @param Tx_Length 发送长度
+ * @param Timeout 超时（ms），比如 10/100，或 HAL_MAX_DELAY
+ * @return uint8_t 执行状态（HAL_OK / HAL_BUSY / HAL_ERROR / HAL_TIMEOUT）
+ */
+uint8_t SPI_Transmit_Data_Blocking(SPI_HandleTypeDef *hspi,GPIO_TypeDef *GPIOx,uint16_t GPIO_Pin,GPIO_PinState Activate_Level,uint8_t *Tx_Buffer,uint16_t Tx_Length,uint32_t Timeout);
+
+/**
  * @brief 交互数据帧
  * 
  * @param hspi SPI编号
@@ -84,7 +98,7 @@ uint8_t SPI_Transmit_Data(SPI_HandleTypeDef *hspi, GPIO_TypeDef *GPIOx, uint16_t
  */
 uint8_t SPI_Transmit_Receive_Data(SPI_HandleTypeDef *hspi, GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin, GPIO_PinState Activate_Level,uint8_t *Tx_Buffer,uint8_t *Rx_Buffer, uint16_t Tx_Length, uint16_t Rx_Length);
 
-void W25Q64_SPI_TxRxCallback(uint8_t *Tx_Buffer,uint8_t *Rx_Buffer,uint16_t Tx_Length,uint16_t Rx_Length);
+
 
 #ifdef __cplusplus
 }
