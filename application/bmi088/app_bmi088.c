@@ -12,9 +12,8 @@
 #include "bmi088reg.h"
 #include "joled.h"
 #include "spi.h"
-#include "stm32f103xb.h"
 #include "stm32f1xx_hal.h"
-#include "stm32f1xx_hal_gpio.h"
+#include "stm32f1xx_hal_def.h"
 #include <stdint.h>
 
 bmi088_handle_t bmi088_handle;
@@ -22,10 +21,20 @@ bmi088_handle_t bmi088_handle;
 
 static uint32_t last_time;
 
+
 static uint8_t bmi088_readid_acc_flag = 0;
 static uint8_t read_accid = 0;
 static uint8_t bmi088_readid_gyro_flag = 0;
 static uint8_t read_gyroid = 0;
+
+static uint8_t bmi088_gyro_get_raw_data_finished_flag;
+static uint8_t bmi088_acc_get_raw_data_finished_flag;
+static uint8_t bmi088_acc_get_raw_data_flag;
+static uint8_t bmi088_gyro_get_raw_data_flag;
+
+//检查glag
+uint8_t checkid_flag = 0;
+uint8_t writereg_flag = 0;
 
 typedef enum
 {
@@ -36,10 +45,45 @@ typedef enum
     init_state_readaccidtocheck,
     init_state_readgyroidtocheck,
     init_state_finishidcheck,
+    init_state_startconfigreg,
     init_state_finish
 } bmi088_init_state_e;
 
 bmi088_init_state_e bmi088_init_state = init_state_start;
+
+typedef struct
+{
+    int16_t gyro_raw_x;
+    int16_t gyro_raw_y;
+    int16_t gyro_raw_z;
+
+    int16_t acc_raw_x;
+    int16_t acc_raw_y;
+    int16_t acc_raw_z;
+
+}bmi088_data_t;
+
+bmi088_data_t bmi088_data;
+
+void bmi088_acc_get_raw_data_finished(int16_t acc_raw_x,int16_t acc_raw_y,int16_t acc_raw_z)
+{
+    bmi088_data.acc_raw_x = acc_raw_x;
+    bmi088_data.acc_raw_y = acc_raw_y;
+    bmi088_data.acc_raw_z = acc_raw_z;
+    bmi088_gyro_get_raw_data_flag = 1;
+    bmi088_acc_get_raw_data_finished_flag = 1;
+}
+
+void bmi088_gyro_get_raw_data_finished(int16_t gyro_raw_x,int16_t gyro_raw_y,int16_t gyro_raw_z)
+{
+    bmi088_data.gyro_raw_x = gyro_raw_x;
+    bmi088_data.gyro_raw_y = gyro_raw_y;
+    bmi088_data.gyro_raw_z = gyro_raw_z;
+
+    bmi088_gyro_get_raw_data_finished_flag = 1;
+}
+
+
 
 static void bmi088_readid_acc_finished(uint8_t accid)
 {
@@ -75,6 +119,8 @@ void app_bmi088_task2(void)
 
 void app_bmi088_init_process_loop(void)
 {
+    if(bmi088_init_state == init_state_finish) return;
+
     if(bmi088_init_state == init_state_accsoftrest)//acc软复位
     {
         bmi088_acc_softreset(&bmi088_handle,NULL);
@@ -127,16 +173,34 @@ void app_bmi088_init_process_loop(void)
             if(read_accid == BMI088_ACC_CHIP_ID_VALUE && read_gyroid == BMI088_GYRO_CHIP_ID_VALUE)
             {
                 JOLED_ShowString(1, 1, "  Check ID OK!   ");
+                checkid_flag = 1;
             }
             else 
             {
                 JOLED_ShowString(1, 1, "!Check ID Error!");
             }
-            bmi088_init_state = init_state_finish;
+            JOLED_ShowString(2, 1, "Start write reg");
+            bmi088_init_state = init_state_startconfigreg;
         }
     }
-
+    else if(bmi088_init_state ==  init_state_startconfigreg)//配置寄存器
+    {
+        bmi088_start(&bmi088_handle);
+        JOLED_ShowString(2, 1, "  write reg ok ");
+        writereg_flag = 1;
+        bmi088_init_state = init_state_finish;
+        JOLED_ShowString(3, 1, "cnt:");
+        if(writereg_flag && checkid_flag)
+        {
+            JOLED_Clear();
+            JOLED_ShowString(4, 1, "BOK");
+        }
+    }
 }
+
+
+
+uint32_t last_time1 = 0;
 
 /**
  * @brief BMI088 循环函数
@@ -145,4 +209,46 @@ void app_bmi088_init_process_loop(void)
 void app_bmi088_loop(void)
 {
     app_bmi088_init_process_loop();
+    if(bmi088_init_state == init_state_finish)
+    {
+        if(bmi088_acc_get_raw_data_flag)
+        {
+            bmi088_get_acc_raw_data(&bmi088_handle, bmi088_acc_get_raw_data_finished);
+        }
+        if(bmi088_gyro_get_raw_data_flag)
+        {
+            bmi088_get_gyro_raw_data(&bmi088_handle, bmi088_gyro_get_raw_data_finished);
+        }
+        if(HAL_GetTick() - last_time1 >= 30)
+        {
+            last_time1 += 30;
+            if(bmi088_gyro_get_raw_data_finished_flag)
+            {
+                bmi088_gyro_get_raw_data_finished_flag = 0;
+                //JOLED_ShowSignedNum(1, 1, bmi088_data.gyro_raw_x, 4);
+                //JOLED_ShowSignedNum(2, 1, bmi088_data.gyro_raw_y, 4);
+                //JOLED_ShowSignedNum(3, 1, bmi088_data.gyro_raw_z, 4);
+            }
+            if(bmi088_acc_get_raw_data_finished_flag)
+            {
+                bmi088_acc_get_raw_data_finished_flag = 0;
+                //JOLED_ShowSignedNum(1, 7, bmi088_data.acc_raw_x, 6);
+                //JOLED_ShowSignedNum(2, 7, bmi088_data.acc_raw_y, 6);
+                //JOLED_ShowSignedNum(3, 7, bmi088_data.acc_raw_z, 6);
+            }
+        }
+    }
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if(GPIO_Pin == GPIO_PIN_11)
+    {
+        if(bmi088_init_state == init_state_finish)
+        {
+            bmi088_acc_get_raw_data_flag = 1;
+            
+            
+        }
+    }
 }

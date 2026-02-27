@@ -3,7 +3,7 @@
   ******************************************************************************
   * @file    bmi088.h
   * @brief   This file contains all the function prototypes for
-  *          the bmi088.c file
+  *          the bmi088.cpp file
   ******************************************************************************
   */
 /* USER CODE END Header */
@@ -31,6 +31,25 @@ typedef void (*bmi088_gyro_read_reg_finishedfunction)(uint8_t read_reg_address, 
 
 typedef void (*bmi088_acc_write_reg_finishedfunction)(uint8_t write_reg_address,uint8_t *tx_data,uint16_t tx_length);
 typedef void (*bmi088_gyro_write_reg_finishedfunction)(uint8_t write_reg_address,uint8_t *tx_data,uint16_t tx_length);
+
+/**
+ * @brief GYRO 原始角速度回调函数（返回三轴 int16 原始值）
+ * 
+ * @param gyro_raw_x 原始X轴角速度
+ * @param gyro_raw_y 原始Y轴角速度
+ * @param gyro_raw_z 原始Z轴角速度
+ */
+typedef void (*bmi088_gyro_get_raw_data_finishedfunction)(int16_t gyro_raw_x,int16_t gyro_raw_y,int16_t gyro_raw_z);
+
+/**
+ * @brief ACC 原始加速度回调函数（返回三轴 int16 原始值）
+ * 
+ * @param acc_raw_x 原始X轴加速度
+ * @param acc_raw_y 原始Y轴加速度
+ * @param acc_raw_z 原始Z轴加速度
+ */
+typedef void (*bmi088_acc_get_raw_data_finishedfunction)(int16_t acc_raw_x,int16_t acc_raw_y,int16_t acc_raw_z);
+
 
 /**
  * @brief BMI088运行状态
@@ -89,6 +108,7 @@ typedef struct
     uint8_t   acc_write_reg_address;
     uint16_t  acc_write_reg_tx_length;
     bmi088_acc_write_reg_finishedfunction acc_write_reg_finishedfunction;
+
     uint8_t   gyro_write_reg_address;
     uint16_t  gyro_write_reg_tx_length;
     bmi088_gyro_write_reg_finishedfunction gyro_write_reg_finishedfunction;
@@ -99,6 +119,12 @@ typedef struct
     bmi088_readid_acc_finishedfunction readid_acc_finishedfunction;
     bmi088_readid_gyro_finishedfunction readid_gyro_finishedfunction;
 
+    //GET DATA  
+    bmi088_gyro_get_raw_data_finishedfunction gyro_get_raw_data_finishedfunction;
+    uint8_t gyro_raw_data_rx_buffer[6];
+
+    bmi088_acc_get_raw_data_finishedfunction acc_get_raw_data_finishedfunction;
+    uint8_t acc_raw_data_rx_buffer[6];
 
 }bmi088_handle_t;
 
@@ -123,6 +149,47 @@ void bmi088_init(bmi088_handle_t *handle,SPI_HandleTypeDef *hspi, GPIO_TypeDef *
                                                                   GPIO_TypeDef *int1_acc_gpiox,uint16_t int1_acc_pin,
                                                                   GPIO_TypeDef *int3_gyro_gpiox,uint16_t int3_gyro_pin
 );
+
+/**
+ * @brief BMI088开始配置参数函数
+ * 
+ * @param handle BMI088句柄指针
+ */
+void bmi088_start(bmi088_handle_t *handle);
+
+/**
+ * @brief bmi088_get_acc_raw_data 获取acc原始加速度（X/Y/Z，共6字节）
+ * 
+ * @param handle BMI088句柄指针
+ * @param acc_get_raw_data_finishedfunction 读取完成回调（三轴int16原始值）
+ */
+void bmi088_get_acc_raw_data(bmi088_handle_t *handle,bmi088_acc_get_raw_data_finishedfunction acc_get_raw_data_finishedfunction);
+
+/**
+ * @brief bmi088_get_gyro_raw_data 获取gyro原始角速度（X/Y/Z，共6字节）
+ * 
+ * @param handle BMI088句柄指针
+ * @param gyro_raw_data_finishedfunction 读取完成回调（三轴int16原始值）
+ */
+void bmi088_get_gyro_raw_data(bmi088_handle_t *handle,bmi088_gyro_get_raw_data_finishedfunction gyro_get_raw_data_finishedfunction);
+
+/**
+ * @brief BMI088 acc 写寄存器阻塞版
+ * 
+ * @param handle BMI088句柄指针
+ * @param Tx_Buffer 发送缓冲区
+ * @param Tx_Length 发送长度
+ */
+void bmi088_acc_write_reg_blocking(bmi088_handle_t *handle,uint8_t *Tx_Buffer,uint16_t Tx_Length);
+
+/**
+ * @brief BMI088 gyro 写寄存器阻塞版
+ * 
+ * @param handle BMI088句柄指针
+ * @param Tx_Buffer 发送缓冲区
+ * @param Tx_Length  发送长度
+ */
+void bmi088_gyro_write_reg_blocking(bmi088_handle_t *handle,uint8_t *Tx_Buffer,uint16_t Tx_Length);
 
 /**
  * @brief 读ACC寄存器ID 期望返回值0x1E
