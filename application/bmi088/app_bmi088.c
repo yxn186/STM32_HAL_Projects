@@ -14,11 +14,20 @@
 #include "spi.h"
 #include "stm32f1xx_hal.h"
 #include "stm32f1xx_hal_def.h"
+#include <math.h>
 #include <stdint.h>
+#include "app_bmi088_math.h"
+#include "Serial.h"
+#include "MahonyAHRS.h"
+
+#define BMI088_RAD2DEG                 (57.295779513f)  // 180°/3.1415926
+#define BMI088_DEG2RAD                 (0.01745329252f) // 3.14/180°
 
 bmi088_handle_t bmi088_handle;
 
-
+float roll = 0,pitch = 0,yaw = 0;
+float x,y;
+float pitch_x,pitch_y,pitch_z,roll_x,roll_y,roll_z;
 static uint32_t last_time;
 
 
@@ -46,6 +55,8 @@ typedef enum
     init_state_readgyroidtocheck,
     init_state_finishidcheck,
     init_state_startconfigreg,
+    init_state_check_data,
+    init_state_wait_check_data,
     init_state_finish
 } bmi088_init_state_e;
 
@@ -188,19 +199,27 @@ void app_bmi088_init_process_loop(void)
         bmi088_start(&bmi088_handle);
         JOLED_ShowString(2, 1, "  write reg ok ");
         writereg_flag = 1;
-        bmi088_init_state = init_state_finish;
-        JOLED_ShowString(3, 1, "cnt:");
+        bmi088_init_state = init_state_check_data;
         if(writereg_flag && checkid_flag)
         {
             JOLED_Clear();
             JOLED_ShowString(4, 1, "BOK");
         }
     }
+    else if(bmi088_init_state == init_state_check_data)
+    {
+        JOLED_ShowString(1, 1, "wait");
+
+        bmi088_biascalibration_start(1000);
+        bmi088_init_state = init_state_wait_check_data;
+    }
 }
 
 
 
 uint32_t last_time1 = 0;
+uint32_t last_time2 = 0;
+uint32_t last_time3 = 0;
 
 /**
  * @brief BMI088 循环函数
@@ -209,33 +228,114 @@ uint32_t last_time1 = 0;
 void app_bmi088_loop(void)
 {
     app_bmi088_init_process_loop();
-    if(bmi088_init_state == init_state_finish)
+
+    if(bmi088_init_state == init_state_wait_check_data)
     {
         if(bmi088_acc_get_raw_data_flag)
         {
+            bmi088_acc_get_raw_data_flag = 0;
             bmi088_get_acc_raw_data(&bmi088_handle, bmi088_acc_get_raw_data_finished);
         }
         if(bmi088_gyro_get_raw_data_flag)
         {
+            bmi088_gyro_get_raw_data_flag = 0;
             bmi088_get_gyro_raw_data(&bmi088_handle, bmi088_gyro_get_raw_data_finished);
         }
-        if(HAL_GetTick() - last_time1 >= 30)
+        if(bmi088_gyro_get_raw_data_finished_flag)
         {
-            last_time1 += 30;
-            if(bmi088_gyro_get_raw_data_finished_flag)
+            if(bmi088_acc_get_raw_data_finished_flag)
             {
                 bmi088_gyro_get_raw_data_finished_flag = 0;
+                bmi088_acc_get_raw_data_finished_flag = 0;
+                bmi088_biascalibration_pushsampletocalculate(bmi088_data.gyro_raw_x,bmi088_data.gyro_raw_y,bmi088_data.gyro_raw_z,bmi088_data.acc_raw_x,bmi088_data.acc_raw_y,bmi088_data.acc_raw_z);
+            }
+        }
+        
+        if(HAL_GetTick() - last_time3 >= 1000)
+        {
+            JOLED_ShowNum(1, 10, bmi088_getbiascalibration_current_samples_effective(), 3);
+            JOLED_ShowNum(1, 6, bmi088_getbiascalibration_current_samples(), 3);
+            last_time3 = HAL_GetTick();
+        }
+
+        if(bmi088_get_biascalibration_finish_flag())
+        {
+            bmi088_init_state = init_state_finish;
+            JOLED_ShowString(1, 1, "ok get:              ");
+            JOLED_ShowNum(1, 8, bmi088_getbiascalibration_current_samples_effective(), 5);
+            
+        }
+        
+    }
+    if(bmi088_init_state == init_state_finish)
+    {
+        if(bmi088_acc_get_raw_data_flag)
+        {
+            bmi088_acc_get_raw_data_flag = 0;
+            bmi088_get_acc_raw_data(&bmi088_handle, bmi088_acc_get_raw_data_finished);
+        }
+        if(bmi088_gyro_get_raw_data_flag)
+        {
+            bmi088_gyro_get_raw_data_flag = 0;
+            bmi088_get_gyro_raw_data(&bmi088_handle, bmi088_gyro_get_raw_data_finished);
+        }
+        if(HAL_GetTick() - last_time1 >= 2)
+        {
+            last_time1 += 2;
+            //bmi088_complementaryfilter_1(bmi088_data.gyro_raw_x,bmi088_data.gyro_raw_y,bmi088_data.gyro_raw_z,bmi088_data.acc_raw_x,bmi088_data.acc_raw_y,bmi088_data.acc_raw_z,0.005);
+            bmi088_mahony_zxy(bmi088_data.gyro_raw_x,bmi088_data.gyro_raw_y,bmi088_data.gyro_raw_z,bmi088_data.acc_raw_x,bmi088_data.acc_raw_y,bmi088_data.acc_raw_z);
+            roll = BMI088_GetRollDeg();
+            pitch = BMI088_GetPitchDeg();
+            yaw = BMI088_GetYawDeg();
+            
+            
+            
+            // float pitch_rad = pitch / 180 * 3.1415926;
+            // float roll_rad = roll / 180 * 3.1415926;
+            // float yaw_rad = yaw / 180 * 3.1415926;
+            // pitch_x = cosf(pitch_rad)*cosf(yaw_rad);
+            // pitch_y = cosf(pitch_rad)*sinf(yaw_rad);
+            // pitch_z = sinf(pitch_rad);
+            // roll_x = cosf(roll_rad)*sinf(yaw_rad);
+            // roll_y = cosf(roll_rad)*cosf(yaw_rad);
+            // roll_z = cosf(roll_rad);
+            // y = atan2f((pitch_z + roll_z),(roll_y + pitch_y)) / 3.1415926 * 180;
+            // x = atan2f((pitch_z + roll_z),(roll_x + pitch_x)) / 3.1415926 * 180;
+            //JOLED_ShowSignedNum(2, 1, roll, 3);
+            //JOLED_ShowSignedNum(2, 5, pitch, 3);
+            //JOLED_ShowSignedNum(2, 9, yaw, 3);
+           // if(bmi088_gyro_get_raw_data_finished_flag)
+            //{
+               // bmi088_gyro_get_raw_data_finished_flag = 0;
                 //JOLED_ShowSignedNum(1, 1, bmi088_data.gyro_raw_x, 4);
                 //JOLED_ShowSignedNum(2, 1, bmi088_data.gyro_raw_y, 4);
                 //JOLED_ShowSignedNum(3, 1, bmi088_data.gyro_raw_z, 4);
-            }
-            if(bmi088_acc_get_raw_data_finished_flag)
-            {
-                bmi088_acc_get_raw_data_finished_flag = 0;
+           // }
+            //if(bmi088_acc_get_raw_data_finished_flag)
+           //{
+                //bmi088_acc_get_raw_data_finished_flag = 0;
                 //JOLED_ShowSignedNum(1, 7, bmi088_data.acc_raw_x, 6);
                 //JOLED_ShowSignedNum(2, 7, bmi088_data.acc_raw_y, 6);
                 //JOLED_ShowSignedNum(3, 7, bmi088_data.acc_raw_z, 6);
-            }
+            //}
+        }
+        if(HAL_GetTick() - last_time2 >= 20)
+        {
+
+            last_time2 += 20; 
+           // float real_roll,real_picth,real_yaw;
+            //euler_extrinsic_ZXY_to_intrinsic_ZXY_deg(yaw,roll,pitch,&real_yaw,&real_roll,&real_picth);
+            //float real_rolle,real_picthe,real_yawe;
+            //euler_extrinsic_ZYX_to_intrinsic_ZYX_deg(bmi088_yaw_angle_deg,bmi088_pitch_angle_deg,bmi088_roll_angle_deg,&real_yawe,&real_picthe,&real_rolle);
+            float real_picthe,real_yawe;
+            //euler_extrinsic_ZYX_to_front_yaw_pitch_deg(bmi088_yaw_angle_deg,bmi088_pitch_angle_deg,bmi088_roll_angle_deg,&real_yawe,&real_picthe);
+            //Serial_Printf("%.8f,%.8f,%.8f\r\n",-roll,-pitch,-yaw);
+            euler_extrinsic_ZXY_to_front_yaw_pitch_deg(yaw,roll,pitch,&real_yawe,&real_picthe);
+            Serial_Printf("%.8f,%.8f,%.8f,%.8f,%.8f\r\n",roll,pitch,yaw,real_picthe,real_yawe);
+            //Serial_Printf("%.8f,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f\r\n",roll,pitch,yaw,real_roll,real_picth,real_yaw,real_picthe,real_yawe);
+            //Serial_Printf("%.8f,%.8f,%.8f,%.8f,%.8f,%.8f\r\n",20.0,10.0,60.0,real_roll,real_picth,real_yaw);
+            //Serial_Printf("%.8f,%.8f,%.8f,%.8f\r\n",q0,q1,q2,q3);
+            //Serial_Printf("%.3f,%.3f,%.3f\r\n",30.0,60.0,90.0);
         }
     }
 }
@@ -244,11 +344,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
     if(GPIO_Pin == GPIO_PIN_11)
     {
-        if(bmi088_init_state == init_state_finish)
+        if(bmi088_init_state == init_state_finish || bmi088_init_state == init_state_check_data || bmi088_init_state == init_state_wait_check_data)
         {
-            bmi088_acc_get_raw_data_flag = 1;
-            
-            
+            bmi088_acc_get_raw_data_flag = 1;  
         }
     }
 }

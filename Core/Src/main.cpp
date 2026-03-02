@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "Serial.h"
 #include "dma.h"
 #include "i2c.h"
 #include "spi.h"
@@ -99,6 +100,7 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   JOLED_Init();
+  Serial_Init();
   app_bmi088_init();
 
 
